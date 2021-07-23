@@ -59,7 +59,8 @@ bool RuckigSmoothing::computeTimeStamps(robot_trajectory::RobotTrajectory& traje
                                         const double max_velocity_scaling_factor,
                                         const double max_acceleration_scaling_factor) const
 {
-  if (trajectory.getWayPointCount() < 2)
+  size_t num_waypoints = trajectory.getWayPointCount();
+  if (num_waypoints < 2)
   {
     RCLCPP_WARN_STREAM(LOGGER, "Trajectory does not have enough points to smooth with Ruckig");
     return true;
@@ -121,47 +122,41 @@ bool RuckigSmoothing::computeTimeStamps(robot_trajectory::RobotTrajectory& traje
     }
   }
 
+  moveit_msgs::msg::RobotTrajectory robot_traj_msg;
+  trajectory.getRobotTrajectoryMsg(robot_traj_msg);
+  trajectory_msgs::msg::JointTrajectory joint_traj_msg = robot_traj_msg.joint_trajectory;
+  for (size_t waypoint = 0; waypoint < num_waypoints - 1; ++waypoint) {
 
-
-
-  moveit_msgs::msg::RobotTrajectory traj_msg;
-  trajectory.getRobotTrajectoryMsg(traj_msg);
-  for (size_t waypoint = 0; waypoint < NUM_WAYPOINTS - 1; ++waypoint){
-    // TODO: NUM_WAYPOINTS???
-
-
-    for (size_t joint = 0; joint < NUM_DOF; ++joint){
-      // TODO: NUM_DOF???
-
-
+    for (size_t joint = 0; joint < num_dof; ++joint){
       // Feed output from the previous timestep back as input
       ruckig_input.current_position[joint] = ruckig_output.new_position[joint];
       ruckig_input.current_velocity[joint] = ruckig_output.new_velocity[joint];
       ruckig_input.current_acceleration[joint] = ruckig_output.new_acceleration[joint];
 
       // Target state is the next waypoint
-      ruckig_input.target_position[joint] = traj_msg.points[waypoint + 1].positions[joint];
-      ruckig_input.target_velocity[joint] = traj_msg.points[waypoint + 1].velocities[joint];
-      ruckig_input.target_acceleration[joint] = traj_msg.points[waypoint + 1].accelerations[joint];
+      ruckig_input.target_position[joint] = joint_traj_msg.points[waypoint + 1].positions[joint];
+      ruckig_input.target_velocity[joint] = joint_traj_msg.points[waypoint + 1].velocities[joint];
+      ruckig_input.target_acceleration[joint] = joint_traj_msg.points[waypoint + 1].accelerations[joint];
     }
     auto ruckig_result = ruckig.update(ruckig_input, ruckig_output);
 
     if (ruckig_result != ruckig::Result::Working) {
 
-      RCLCPP_INFO(get_logger(), "Ruckig failed at waypoint " << waypoint);
+      RCLCPP_INFO_STREAM(LOGGER, "Ruckig failed at waypoint " << waypoint);
       continue;   // skip to next waypoint
 
     }
 
     // Store result back in the trajectory data structure
-    for (size_t joint = 0; jount < NUM_DOF; ++joint) {
+    for (size_t joint = 0; joint < num_dof; ++joint) {
       // TODO: NUM_DOF ???
-      traj_msg.points[waypoint + 1].velocities[joint] = ruckig_output.new_velocity[joint];
-      traj_msg.ppints[waypoint + 1].positions[joint] = ruckig_output.new_position[joint];
+      joint_traj_msg.points[waypoint + 1].velocities[joint] = ruckig_output.new_velocity[joint];
+      joint_traj_msg.points[waypoint + 1].positions[joint] = ruckig_output.new_position[joint];
     }
   }
-
-  RCLCPP_INFO(get_logger(), "Done smoothing");
+  robot_traj_msg.joint_trajectory = joint_traj_msg;
+  trajectory.setRobotTrajectoryMsg(trajectory.getFirstWayPoint(), robot_traj_msg);
+  RCLCPP_INFO(LOGGER, "Done smoothing");
 
   return true;
 }
