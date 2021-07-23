@@ -36,15 +36,14 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <limits>
-#include <Eigen/Geometry>
 #include <algorithm>
 #include <cmath>
-#include <moveit/trajectory_processing/ruckig.h>
+#include <Eigen/Geometry>
+#include <limits>
+#include <moveit/trajectory_processing/ruckig_traj_smoothing.h>
+#include <rclcpp/rclcpp.hpp>
 #include <ruckig/ruckig.hpp>
 #include <vector>
-#include "rclcpp/rclcpp.hpp"
-#include <ruckig/ruckig.hpp>
 
 namespace trajectory_processing
 {
