@@ -54,9 +54,6 @@ public:
 
   void initialize(const rclcpp::Node::SharedPtr& node, const std::string& parameter_namespace) override
   {
-    path_tolerance_ = getParam(node, LOGGER, parameter_namespace, "path_tolerance", 0.1);
-    resample_dt_ = getParam(node, LOGGER, parameter_namespace, "resample_dt", 0.1);
-    min_angle_change_ = getParam(node, LOGGER, parameter_namespace, "min_angle_change", 0.001);
   }
 
   std::string getDescription() const override
@@ -83,11 +80,6 @@ public:
 
     return result;
   }
-
-protected:
-  double path_tolerance_;
-  double resample_dt_;
-  double min_angle_change_;
 };
 
 }  // namespace default_planner_request_adapters
