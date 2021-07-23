@@ -44,6 +44,7 @@
 #include <ruckig/ruckig.hpp>
 #include <vector>
 #include "rclcpp/rclcpp.hpp"
+#include <ruckig/ruckig.hpp>
 
 namespace trajectory_processing
 {
@@ -122,6 +123,9 @@ bool RuckigSmoothing::computeTimeStamps(robot_trajectory::RobotTrajectory& traje
 
 
 
+
+  moveit_msgs::msg::RobotTrajectory traj_msg;
+  trajectory.getRobotTrajectoryMsg(traj_msg);
   for (size_t waypoint = 0; waypoint < NUM_WAYPOINTS - 1; ++waypoint){
     // TODO: NUM_WAYPOINTS???
 
@@ -136,10 +140,11 @@ bool RuckigSmoothing::computeTimeStamps(robot_trajectory::RobotTrajectory& traje
       ruckig_input.current_acceleration[joint] = ruckig_output.new_acceleration[joint];
 
       // Target state is the next waypoint
-      ruckig_input.target_position[joint] = trajectory.points[waypoint + 1].positions[joint];
-      ruckig_input.target_velocity[joint] = trajectory.points[waypoint + 1].velocities[joint];
-      ruckig_input.target_acceleration[joint] = trajectory.points[waypoint + 1].accelerations[joint];
+      ruckig_input.target_position[joint] = traj_msg.points[waypoint + 1].positions[joint];
+      ruckig_input.target_velocity[joint] = traj_msg.points[waypoint + 1].velocities[joint];
+      ruckig_input.target_acceleration[joint] = traj_msg.points[waypoint + 1].accelerations[joint];
     }
+    auto ruckig_result = ruckig.update(ruckig_input, ruckig_output);
 
     if (ruckig_result != ruckig::Result::Working) {
 
@@ -151,8 +156,8 @@ bool RuckigSmoothing::computeTimeStamps(robot_trajectory::RobotTrajectory& traje
     // Store result back in the trajectory data structure
     for (size_t joint = 0; jount < NUM_DOF; ++joint) {
       // TODO: NUM_DOF ???
-      trajectory.points[waypoint + 1].velocities[joint] = ruckig_output.new_velocity[joint];
-      trajectory.ppints[waypoint + 1].positions[joint] = ruckig_output.new_position[joint];
+      traj_msg.points[waypoint + 1].velocities[joint] = ruckig_output.new_velocity[joint];
+      traj_msg.ppints[waypoint + 1].positions[joint] = ruckig_output.new_position[joint];
     }
   }
 
