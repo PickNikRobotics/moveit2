@@ -122,34 +122,34 @@ bool RuckigSmoothing::computeTimeStamps(robot_trajectory::RobotTrajectory& traje
     }
   }
 
-  for (size_t waypoint = 0; waypoint < num_waypoints - 1; ++waypoint) {
-
+  ruckig::Result ruckig_result;
+  for (size_t waypoint = 0; waypoint < num_waypoints - 1; ++waypoint)
+  {
     moveit::core::RobotStatePtr robot_state = trajectory.getWayPointPtr(waypoint + 1);
-    for (size_t joint = 0; joint < num_dof; ++joint){
+    for (size_t joint = 0; joint < num_dof; ++joint)
+    {
       // Feed output from the previous timestep back as input
       ruckig_input.current_position[joint] = ruckig_output.new_position[joint];
       ruckig_input.current_velocity[joint] = ruckig_output.new_velocity[joint];
       ruckig_input.current_acceleration[joint] = ruckig_output.new_acceleration[joint];
 
-      
       // Target state is the next waypoint
       ruckig_input.target_position[joint] = robot_state->getVariablePosition(joint);
       ruckig_input.target_velocity[joint] = robot_state->getVariableVelocity(joint);
       ruckig_input.target_acceleration[joint] = robot_state->getVariableAcceleration(joint);
     }
-    auto ruckig_result = ruckig.update(ruckig_input, ruckig_output);
+    ruckig_result = ruckig.update(ruckig_input, ruckig_output);
 
-    if (ruckig_result != ruckig::Result::Working) {
+    if (ruckig_result != ruckig::Result::Working)
+    {
       RCLCPP_INFO_STREAM(LOGGER, "Ruckig failed at waypoint " << waypoint);
-      continue;   // skip to next waypoint
+      continue;  // skip to next waypoint
     }
 
     // Store result back in the trajectory data structure
     robot_state->setVariableVelocities(ruckig_output.new_velocity);
     robot_state->setVariablePositions(ruckig_output.new_position);
   }
-
-  RCLCPP_INFO(LOGGER, "Done smoothing");
 
   return true;
 }
