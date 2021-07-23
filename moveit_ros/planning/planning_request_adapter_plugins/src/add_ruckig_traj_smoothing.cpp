@@ -32,7 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-/* Author: Ioan Sucan, Michael Ferguson */
+/* Author: Jack Center, Wyatt Rees, Andy Zelenak */
 
 #include <moveit/planning_request_adapter/planning_request_adapter.h>
 #include <moveit/trajectory_processing/ruckig_traj_smoothing.h>
@@ -45,7 +45,7 @@ using namespace trajectory_processing;
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("moveit_ros.add_traj_smoothing");
 
 /** @brief This adapter uses the time-optimal trajectory generation method */
-class AddTrajectorySmoothing: public planning_request_adapter::PlanningRequestAdapter
+class AddTrajectorySmoothing : public planning_request_adapter::PlanningRequestAdapter
 {
 public:
   AddTrajSmoothing() : planning_request_adapter::PlanningRequestAdapter()
@@ -74,7 +74,7 @@ public:
       RCLCPP_DEBUG(LOGGER, " Running '%s'", getDescription().c_str());
       RuckigSmoothing smoother;
       if (!smoother.computeTimeStamps(*res.trajectory_, req.max_velocity_scaling_factor,
-                                  req.max_acceleration_scaling_factor))
+                                      req.max_acceleration_scaling_factor))
       {
         RCLCPP_WARN(LOGGER, " Trajectory smoothing for the solution path failed.");
         result = false;
