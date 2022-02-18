@@ -83,10 +83,10 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
 
   // Instantiate the smoother
   double timestep = trajectory.getAverageSegmentDuration();
-  std::unique_ptr<ruckig::Ruckig<0>> ruckig_ptr;
-  ruckig_ptr = std::make_unique<ruckig::Ruckig<0>>(num_dof, timestep);
-  ruckig::InputParameter<0> ruckig_input{ num_dof };
-  ruckig::OutputParameter<0> ruckig_output{ num_dof };
+  std::unique_ptr<ruckig::Ruckig<RUCKIG_DYNAMIC_DOF>> ruckig_ptr;
+  ruckig_ptr = std::make_unique<ruckig::Ruckig<RUCKIG_DYNAMIC_DOF>>(num_dof, timestep);
+  ruckig::InputParameter<RUCKIG_DYNAMIC_DOF> ruckig_input{ num_dof };
+  ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF> ruckig_output{ num_dof };
 
   // Initialize the smoother
   const std::vector<int>& idx = group->getVariableIndexList();
@@ -169,13 +169,7 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
       }
 
       // Overwrite pos/vel/accel of the target waypoint
-      for (size_t joint = 0; joint < num_dof; ++joint)
-      {
-        next_waypoint->setVariablePosition(idx.at(joint), ruckig_output.new_position.at(joint));
-        next_waypoint->setVariableVelocity(idx.at(joint), ruckig_output.new_velocity.at(joint));
-        next_waypoint->setVariableAcceleration(idx.at(joint), ruckig_output.new_acceleration.at(joint));
-      }
-      next_waypoint->update();
+      setRobotStateFromRuckigOutput(ruckig_output, num_dof, idx, next_waypoint);
     }
 
     // If ruckig failed, the duration of the seed trajectory likely wasn't long enough.
@@ -200,7 +194,7 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
       }
 
       timestep = trajectory.getAverageSegmentDuration();
-      ruckig_ptr = std::make_unique<ruckig::Ruckig<0>>(num_dof, timestep);
+      ruckig_ptr = std::make_unique<ruckig::Ruckig<RUCKIG_DYNAMIC_DOF>>(num_dof, timestep);
     }
   }
 
@@ -215,8 +209,34 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
   return true;
 }
 
-void RuckigSmoothing::initializeRuckigState(ruckig::InputParameter<0>& ruckig_input,
-                                            ruckig::OutputParameter<0>& ruckig_output,
+void RuckigSmoothing::setRobotStateFromRuckigOutput(const ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF> ruckig_output,
+                                                    const size_t num_dof, const std::vector<int>& joint_idx,
+                                                    moveit::core::RobotStatePtr state)
+{
+  for (size_t joint = 0; joint < num_dof; ++joint)
+  {
+    state->setVariablePosition(joint_idx.at(joint), ruckig_output.new_position.at(joint));
+    state->setVariableVelocity(joint_idx.at(joint), ruckig_output.new_velocity.at(joint));
+    state->setVariableAcceleration(joint_idx.at(joint), ruckig_output.new_acceleration.at(joint));
+  }
+  state->update();
+}
+
+void RuckigSmoothing::decreaseTargetStateVelocity(const size_t num_dof, const double timestep,
+                                                  ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input)
+{
+  for (size_t joint = 0; joint < num_dof; ++joint)
+  {
+    ruckig_input.target_velocity.at(joint) *= 0.9;
+    // Propagate the change in velocity to acceleration, too.
+    // We don't change the position to ensure the exact target position is achieved.
+    ruckig_input.target_acceleration.at(joint) =
+        (ruckig_input.target_velocity.at(joint) - ruckig_input.current_velocity.at(joint)) / timestep;
+  }
+}
+
+void RuckigSmoothing::initializeRuckigState(ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input,
+                                            ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output,
                                             const moveit::core::RobotState& first_waypoint, size_t num_dof,
                                             const std::vector<int>& idx)
 {
@@ -248,7 +268,7 @@ bool RuckigSmoothing::checkForIdenticalWaypoints(const moveit::core::RobotState&
   return (magnitude_position_difference <= IDENTICAL_POSITION_EPSILON);
 }
 
-double RuckigSmoothing::getTargetVelocityMagnitude(const ruckig::InputParameter<0>& ruckig_input, size_t num_dof)
+double RuckigSmoothing::getTargetVelocityMagnitude(const ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input, size_t num_dof)
 {
   double vel_magnitude = 0;
   for (size_t joint = 0; joint < num_dof; ++joint)
@@ -258,8 +278,8 @@ double RuckigSmoothing::getTargetVelocityMagnitude(const ruckig::InputParameter<
   return sqrt(vel_magnitude);
 }
 
-bool RuckigSmoothing::checkForLaggingMotion(const size_t num_dof, const ruckig::InputParameter<0>& ruckig_input,
-                                            const ruckig::OutputParameter<0>& ruckig_output)
+bool RuckigSmoothing::checkForLaggingMotion(const size_t num_dof, const ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input,
+                                            const ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output)
 {
   // Check for backward motion of any joint
   for (size_t joint = 0; joint < num_dof; ++joint)
@@ -273,9 +293,9 @@ bool RuckigSmoothing::checkForLaggingMotion(const size_t num_dof, const ruckig::
   return false;
 }
 
-void RuckigSmoothing::getNextRuckigInput(const ruckig::OutputParameter<0>& ruckig_output,
+void RuckigSmoothing::getNextRuckigInput(const ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output,
                                          const moveit::core::RobotStatePtr& next_waypoint, size_t num_dof,
-                                         const std::vector<int>& idx, ruckig::InputParameter<0>& ruckig_input)
+                                         const std::vector<int>& idx, ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input)
 {
   // TODO(andyz): https://github.com/ros-planning/moveit2/issues/766
   // ruckig_output.pass_to_input(ruckig_input);
