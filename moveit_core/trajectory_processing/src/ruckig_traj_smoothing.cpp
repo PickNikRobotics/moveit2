@@ -167,7 +167,7 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
 
     // If ruckig failed, the duration of the seed trajectory likely wasn't long enough.
     // Try duration extension several times.
-    if (ruckig_result == ruckig::Result::Working)
+    if (ruckig_result == ruckig::Result::Finished)
     {
       smoothing_complete = true;
     }
