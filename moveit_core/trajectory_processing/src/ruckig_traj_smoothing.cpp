@@ -48,11 +48,12 @@ namespace
 const rclcpp::Logger LOGGER = rclcpp::get_logger("moveit_trajectory_processing.ruckig_traj_smoothing");
 constexpr double DEFAULT_MAX_VELOCITY = 5;           // rad/s
 constexpr double DEFAULT_MAX_ACCELERATION = 10;      // rad/s^2
-constexpr double DEFAULT_MAX_JERK = 20;              // rad/s^3
+constexpr double DEFAULT_MAX_JERK = 200;              // rad/s^3
 constexpr double IDENTICAL_POSITION_EPSILON = 1e-3;  // rad
 constexpr double MAX_DURATION_EXTENSION_FACTOR = 5.0;
 constexpr double DURATION_EXTENSION_FRACTION = 1.1;
-constexpr double MINIMUM_VELOCITY_SEARCH_MAGNITUDE = 0.01;  // rad/s. Stop searching when velocity drops below this
+constexpr double MINIMUM_VELOCITY_SEARCH_MAGNITUDE = 0.0001;  // rad/s. Stop searching when velocity drops below this
+constexpr double LAG_TOLERANCE = 0.005;  // unitless fraction, used in lead/lag detection
 }  // namespace
 
 bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajectory,
@@ -136,11 +137,12 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
       ruckig_result = ruckig_ptr->update(ruckig_input, ruckig_output);
 
       // If the requested velocity is too great, a joint can actually "move backward" to give itself more time to
-      // accelerate to the target velocity. Iterate and decrease velocities until that behavior is gone.
-      bool backward_motion_detected = checkForLaggingMotion(num_dof, ruckig_input, ruckig_output);
+      // accelerate to the target velocity (or way-overshoot to do the same).
+      // Iterate and decrease velocities until that behavior is gone.
+      bool lead_or_lag_detected = detectLeadingOrLaggingMotion(num_dof, ruckig_input, ruckig_output);
 
       double velocity_magnitude = getTargetVelocityMagnitude(ruckig_input, num_dof);
-      while (backward_motion_detected && (velocity_magnitude > MINIMUM_VELOCITY_SEARCH_MAGNITUDE))
+      while (lead_or_lag_detected && (velocity_magnitude > MINIMUM_VELOCITY_SEARCH_MAGNITUDE))
       {
         // Skip repeated waypoints with no change in position. Ruckig does not handle this well and there's really no
         // need to smooth it. Simply set it equal to the previous (identical) waypoint.
@@ -157,7 +159,7 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
         ruckig_result = ruckig_ptr->update(ruckig_input, ruckig_output);
 
         // check for backward motion
-        backward_motion_detected = checkForLaggingMotion(num_dof, ruckig_input, ruckig_output);
+        lead_or_lag_detected = detectLeadingOrLaggingMotion(num_dof, ruckig_input, ruckig_output);
       }
 
       // Overwrite pos/vel/accel of the target waypoint
@@ -268,14 +270,13 @@ double RuckigSmoothing::getTargetVelocityMagnitude(const ruckig::InputParameter<
   return sqrt(vel_magnitude);
 }
 
-bool RuckigSmoothing::checkForLaggingMotion(const size_t num_dof, const ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input,
+bool RuckigSmoothing::detectLeadingOrLaggingMotion(const size_t num_dof, const ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input,
                                             const ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output)
 {
-  // Check for backward motion of any joint
   for (size_t joint = 0; joint < num_dof; ++joint)
   {
-    // This indicates the jerk-limited output lags the target output
-    if ((ruckig_output.new_velocity.at(joint) / ruckig_input.target_velocity.at(joint)) < 1)
+    if (((ruckig_output.new_velocity.at(joint) / ruckig_input.target_velocity.at(joint)) < (1 - LAG_TOLERANCE)) ||
+        (ruckig_output.new_velocity.at(joint) / ruckig_input.target_velocity.at(joint)) > (1 + LAG_TOLERANCE))
     {
       return true;
     }

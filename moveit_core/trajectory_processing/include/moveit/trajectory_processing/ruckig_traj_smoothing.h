@@ -68,13 +68,13 @@ private:
                                  const std::vector<int>& idx, ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input);
 
   /**
-   * \brief Check for lagging motion of any joint at a waypoint.
+   * \brief Check for leading or lagging motion of any joint at a waypoint.
    * \param num_dof       Number  of actuated joints
    * \param ruckig_input  Input parameters to Ruckig
    * \param ruckig_output Output parameters from Ruckig
-   * \return              true if lagging motion is detected on any joint
+   * \return              true if leading or lagging motion is detected on any joint
    */
-  static bool checkForLaggingMotion(const size_t num_dof, const ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input,
+  static bool detectLeadingOrLaggingMotion(const size_t num_dof, const ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input,
                                     const ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output);
 
   /**
