@@ -52,7 +52,6 @@ constexpr double DEFAULT_MAX_JERK = 200;              // rad/s^3
 constexpr double IDENTICAL_POSITION_EPSILON = 1e-3;  // rad
 constexpr double MAX_DURATION_EXTENSION_FACTOR = 5.0;
 constexpr double DURATION_EXTENSION_FRACTION = 1.1;
-constexpr double MINIMUM_VELOCITY_SEARCH_MAGNITUDE = 0.0001;  // rad/s. Stop searching when velocity drops below this
 constexpr double LAG_TOLERANCE = 0.005;  // unitless fraction, used in lead/lag detection
 }  // namespace
 
@@ -141,52 +140,31 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
       // Iterate and decrease velocities until that behavior is gone.
       bool lead_or_lag_detected = detectLeadingOrLaggingMotion(num_dof, ruckig_input, ruckig_output);
 
-      double velocity_magnitude = getTargetVelocityMagnitude(ruckig_input, num_dof);
-      while (lead_or_lag_detected && (velocity_magnitude > MINIMUM_VELOCITY_SEARCH_MAGNITUDE))
+      if (lead_or_lag_detected)
       {
-        // Skip repeated waypoints with no change in position. Ruckig does not handle this well and there's really no
-        // need to smooth it. Simply set it equal to the previous (identical) waypoint.
-        if (checkForIdenticalWaypoints(*trajectory.getWayPointPtr(waypoint_idx), *next_waypoint, trajectory.getGroup()))
+        // If ruckig failed, the duration of the seed trajectory likely wasn't long enough.
+        // Try duration extension several times.
+        smoothing_complete = (ruckig_result == ruckig::Result::Finished);
+        if (!smoothing_complete)
         {
-          *next_waypoint = trajectory.getWayPoint(waypoint_idx);
-          break;
+          // If Ruckig failed on the final waypoint, it's likely the original seed trajectory did not
+          // have a long enough duration when jerk is taken into account. Extend the duration and try
+          // again.
+          initializeRuckigState(ruckig_input, ruckig_output, *trajectory.getFirstWayPointPtr(), num_dof, idx);
+          duration_extension_factor *= DURATION_EXTENSION_FRACTION;
+          // Reset the trajectory
+          trajectory = robot_trajectory::RobotTrajectory(original_trajectory, true /* deep copy */);
+          for (size_t waypoint_idx = 1; waypoint_idx < num_waypoints; ++waypoint_idx)
+          {
+            trajectory.setWayPointDurationFromPrevious(
+                waypoint_idx, duration_extension_factor * trajectory.getWayPointDurationFromPrevious(waypoint_idx));
+            // TODO(andyz): re-calculate waypoint velocity and acceleration here?
+          }
+
+          timestep = trajectory.getWayPointDurationFromStart(num_waypoints - 1) / (trajectory.getWayPointCount() - 1);
+          ruckig_ptr = std::make_unique<ruckig::Ruckig<RUCKIG_DYNAMIC_DOF>>(num_dof, timestep);
         }
-
-        // decrease target velocity
-        decreaseTargetStateVelocity(num_dof, timestep, ruckig_input);
-        velocity_magnitude = getTargetVelocityMagnitude(ruckig_input, num_dof);
-        // Run Ruckig
-        ruckig_result = ruckig_ptr->update(ruckig_input, ruckig_output);
-
-        // check for backward motion
-        lead_or_lag_detected = detectLeadingOrLaggingMotion(num_dof, ruckig_input, ruckig_output);
       }
-
-      // Overwrite pos/vel/accel of the target waypoint
-      setRobotStateFromRuckigOutput(ruckig_output, num_dof, idx, next_waypoint);
-    }
-
-    // If ruckig failed, the duration of the seed trajectory likely wasn't long enough.
-    // Try duration extension several times.
-    smoothing_complete = (ruckig_result == ruckig::Result::Finished);
-    if (!smoothing_complete)
-    {
-      // If Ruckig failed on the final waypoint, it's likely the original seed trajectory did not
-      // have a long enough duration when jerk is taken into account. Extend the duration and try
-      // again.
-      initializeRuckigState(ruckig_input, ruckig_output, *trajectory.getFirstWayPointPtr(), num_dof, idx);
-      duration_extension_factor *= DURATION_EXTENSION_FRACTION;
-      // Reset the trajectory
-      trajectory = robot_trajectory::RobotTrajectory(original_trajectory, true /* deep copy */);
-      for (size_t waypoint_idx = 1; waypoint_idx < num_waypoints; ++waypoint_idx)
-      {
-        trajectory.setWayPointDurationFromPrevious(
-            waypoint_idx, duration_extension_factor * trajectory.getWayPointDurationFromPrevious(waypoint_idx));
-        // TODO(andyz): re-calculate waypoint velocity and acceleration here?
-      }
-
-      timestep = trajectory.getWayPointDurationFromStart(num_waypoints - 1) / (trajectory.getWayPointCount() - 1);
-      ruckig_ptr = std::make_unique<ruckig::Ruckig<RUCKIG_DYNAMIC_DOF>>(num_dof, timestep);
     }
   }
 
@@ -275,7 +253,10 @@ bool RuckigSmoothing::detectLeadingOrLaggingMotion(const size_t num_dof, const r
 {
   for (size_t joint = 0; joint < num_dof; ++joint)
   {
-    if (((ruckig_output.new_velocity.at(joint) / ruckig_input.target_velocity.at(joint)) < (1 - LAG_TOLERANCE)) ||
+    if (
+        // Lagging velocity
+        ((ruckig_output.new_velocity.at(joint) / ruckig_input.target_velocity.at(joint)) < (1 - LAG_TOLERANCE)) ||
+        // Leading velocity
         (ruckig_output.new_velocity.at(joint) / ruckig_input.target_velocity.at(joint)) > (1 + LAG_TOLERANCE))
     {
       return true;
