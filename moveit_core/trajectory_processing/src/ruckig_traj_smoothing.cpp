@@ -50,7 +50,7 @@ constexpr double DEFAULT_MAX_VELOCITY = 5;           // rad/s
 constexpr double DEFAULT_MAX_ACCELERATION = 10;      // rad/s^2
 constexpr double DEFAULT_MAX_JERK = 200;              // rad/s^3
 constexpr double IDENTICAL_POSITION_EPSILON = 1e-3;  // rad
-constexpr double MAX_DURATION_EXTENSION_FACTOR = 5.0;
+constexpr double MAX_DURATION_EXTENSION_FACTOR = 10.0;
 constexpr double DURATION_EXTENSION_FRACTION = 1.1;
 constexpr double LAG_TOLERANCE = 0.005;  // unitless fraction, used in lead/lag detection
 }  // namespace
@@ -142,14 +142,11 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
 
       if (lead_or_lag_detected)
       {
-        // If ruckig failed, the duration of the seed trajectory likely wasn't long enough.
+        // If Ruckig failed, the duration of the seed trajectory likely wasn't long enough.
         // Try duration extension several times.
         smoothing_complete = (ruckig_result == ruckig::Result::Finished);
         if (!smoothing_complete)
         {
-          // If Ruckig failed on the final waypoint, it's likely the original seed trajectory did not
-          // have a long enough duration when jerk is taken into account. Extend the duration and try
-          // again.
           initializeRuckigState(ruckig_input, ruckig_output, *trajectory.getFirstWayPointPtr(), num_dof, idx);
           duration_extension_factor *= DURATION_EXTENSION_FRACTION;
           // Reset the trajectory
