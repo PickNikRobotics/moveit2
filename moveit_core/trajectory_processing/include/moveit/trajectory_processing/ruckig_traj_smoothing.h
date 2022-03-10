@@ -31,7 +31,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *******************************************************************************/
 
-/* Author: Jack Center, Wyatt Rees, Andy Zelenak */
+/* Author: Jack Center, Wyatt Rees, Andy Zelenak, Stephanie Eng */
 
 #pragma once
 

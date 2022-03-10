@@ -31,7 +31,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *******************************************************************************/
 
-/* Author: Jack Center, Wyatt Rees, Andy Zelenak */
+/* Author: Jack Center, Wyatt Rees, Andy Zelenak, Stephanie Eng */
 
 #include <algorithm>
 #include <cmath>
@@ -88,8 +88,8 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
   ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF> ruckig_output{ num_dof };
 
   // Initialize the smoother
-  const std::vector<int>& idx = group->getVariableIndexList();
-  initializeRuckigState(ruckig_input, ruckig_output, *trajectory.getFirstWayPointPtr(), num_dof, idx);
+  const std::vector<int>& move_group_idx = group->getVariableIndexList();
+  initializeRuckigState(ruckig_input, ruckig_output, *trajectory.getFirstWayPointPtr(), num_dof, move_group_idx);
 
   // Kinematic limits (vel/accel/jerk)
   const std::vector<std::string>& vars = group->getVariableNames();
@@ -129,7 +129,7 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
     {
       moveit::core::RobotStatePtr next_waypoint = trajectory.getWayPointPtr(waypoint_idx + 1);
 
-      getNextRuckigInput(ruckig_output, next_waypoint, num_dof, idx, ruckig_input);
+      getNextRuckigInput(ruckig_output, next_waypoint, num_dof, move_group_idx, ruckig_input);
 
       // Run Ruckig
       ruckig_result = ruckig_ptr->update(ruckig_input, ruckig_output);
@@ -158,9 +158,10 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
           auto target_state = trajectory.getWayPointPtr(time_stretch_idx);
           for (size_t joint = 0; joint < num_dof; ++joint)
           {
-            target_state->setVariableVelocity(idx.at(joint), (1 / duration_extension_factor) *
-                                                                 target_state->getVariableVelocity(idx.at(joint)));
-            target_state->setVariableAcceleration(idx.at(joint), 0);
+            target_state->setVariableVelocity(move_group_idx.at(joint),
+                                              (1 / duration_extension_factor) *
+                                                  target_state->getVariableVelocity(move_group_idx.at(joint)));
+            target_state->setVariableAcceleration(move_group_idx.at(joint), 0);
           }
           target_state->update();
         }
@@ -168,7 +169,7 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
         timestep = trajectory.getWayPointDurationFromStart(num_waypoints - 1) / (trajectory.getWayPointCount() - 1);
         ruckig_ptr = std::make_unique<ruckig::Ruckig<RUCKIG_DYNAMIC_DOF>>(num_dof, timestep);
         waypoint_idx = 0;
-        initializeRuckigState(ruckig_input, ruckig_output, *trajectory.getFirstWayPointPtr(), num_dof, idx);
+        initializeRuckigState(ruckig_input, ruckig_output, *trajectory.getFirstWayPointPtr(), num_dof, move_group_idx);
         break;
       }
     }
