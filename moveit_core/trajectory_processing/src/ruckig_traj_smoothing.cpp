@@ -156,17 +156,27 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
               duration_extension_factor * original_trajectory.getWayPointDurationFromPrevious(time_stretch_idx));
           // re-calculate waypoint velocity and acceleration
           auto target_state = trajectory.getWayPointPtr(time_stretch_idx);
+          auto const prev_state = trajectory.getWayPointPtr(time_stretch_idx - 1);
+          timestep = trajectory.getWayPointDurationFromStart(num_waypoints - 1) / (trajectory.getWayPointCount() - 1);
           for (size_t joint = 0; joint < num_dof; ++joint)
           {
             target_state->setVariableVelocity(move_group_idx.at(joint),
                                               (1 / duration_extension_factor) *
                                                   target_state->getVariableVelocity(move_group_idx.at(joint)));
-            target_state->setVariableAcceleration(move_group_idx.at(joint), 0);
+            if (time_stretch_idx > 0)
+            {
+              double prev_velocity = prev_state->getVariableVelocity(move_group_idx.at(joint));
+              double curr_velocity = target_state->getVariableVelocity(move_group_idx.at(joint));
+              target_state->setVariableAcceleration(move_group_idx.at(joint), (curr_velocity - prev_velocity) / timestep);
+            }
+            // At the first waypoint
+            else
+            {
+              target_state->setVariableAcceleration(move_group_idx.at(joint), 0);
+            }
           }
           target_state->update();
         }
-
-        timestep = trajectory.getWayPointDurationFromStart(num_waypoints - 1) / (trajectory.getWayPointCount() - 1);
         ruckig_ptr = std::make_unique<ruckig::Ruckig<RUCKIG_DYNAMIC_DOF>>(num_dof, timestep);
         waypoint_idx = 0;
         initializeRuckigState(ruckig_input, ruckig_output, *trajectory.getFirstWayPointPtr(), num_dof, move_group_idx);
