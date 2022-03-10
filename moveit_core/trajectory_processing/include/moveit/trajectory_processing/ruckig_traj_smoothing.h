@@ -74,44 +74,9 @@ private:
    * \param ruckig_output Output parameters from Ruckig
    * \return              true if leading or lagging motion is detected on any joint
    */
-  static bool detectLeadingOrLaggingMotion(const size_t num_dof, const ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input,
-                                    const ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output);
-
-  /**
-   * \brief Return L2-norm of velocity, taking all joints into account.
-   * \param ruckig_input  Input parameters to Ruckig
-   * \param num_dof       Number  of actuated joints
-   */
-  static double getTargetVelocityMagnitude(const ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input, size_t num_dof);
-
-  /**
-   * \brief Check if the joint positions of two waypoints are very similar.
-   * \param prev_waypoint State at waypoint i-1
-   * \param prev_waypoint State at waypoint i
-   * \joint_group         The MoveIt JointModelGroup of interest
-   */
-  static bool checkForIdenticalWaypoints(const moveit::core::RobotState& prev_waypoint,
-                                         const moveit::core::RobotState& next_waypoint,
-                                         const moveit::core::JointModelGroup* joint_group);
-
-  /**
-   * \brief Set position, velocity, and acceleration of a RobotState from a Ruckig output state
-   * \param ruckig_output Output from Ruckig
-   * \param num_dof       Degrees of freedom of the robot
-   * \param state         State to be updated
-   */
-  static void setRobotStateFromRuckigOutput(const ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF> ruckig_output,
-                                            const size_t num_dof, const std::vector<int>& joint_idx,
-                                            moveit::core::RobotStatePtr state);
-
-  /**
-   * \brief Decrease ruckig_input.target_velocity and ruckig_input.target_acceleration
-   * \param num_dof       Degrees of freedom of the robot
-   * \param timestep      Ruckig timestep (sec)
-   * \param rucking_input Target state to be adjusted
-   */
-  static void decreaseTargetStateVelocity(const size_t num_dof, const double timestep,
-                                          ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input);
+  static bool detectLeadingOrLaggingMotion(const size_t num_dof,
+                                           const ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input,
+                                           const ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output);
 
   /**
    * \brief Initialize Ruckig position/vel/accel. This initializes ruckig_input and ruckig_output to the same values
@@ -121,7 +86,8 @@ private:
    * \param num_dof         Number  of actuated joints
    * \param joint_idx       MoveIt list of joint group indices
    */
-  static void initializeRuckigState(ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input, ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output,
+  static void initializeRuckigState(ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input,
+                                    ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output,
                                     const moveit::core::RobotState& first_waypoint, size_t num_dof,
                                     const std::vector<int>& joint_idx);
 };
