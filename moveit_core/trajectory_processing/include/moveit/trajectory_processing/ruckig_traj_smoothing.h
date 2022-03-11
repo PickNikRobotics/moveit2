@@ -42,11 +42,6 @@
 
 namespace trajectory_processing
 {
-namespace
-{
-constexpr size_t RUCKIG_DYNAMIC_DOF = 0;  // Put Ruckig in "dynamic DOF" mode
-}
-
 class RuckigSmoothing
 {
 public:
@@ -63,9 +58,10 @@ private:
    * \param idx             MoveIt list of joint group indices
    * \param ruckig_input    Output. The Rucking parameters for the next iteration
    */
-  static void getNextRuckigInput(const ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output,
+  static void getNextRuckigInput(const ruckig::OutputParameter<ruckig::DynamicDOFs>& ruckig_output,
                                  const moveit::core::RobotStatePtr& next_waypoint, size_t num_dof,
-                                 const std::vector<int>& idx, ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input);
+                                 const std::vector<int>& idx,
+                                 ruckig::InputParameter<ruckig::DynamicDOFs>& ruckig_input);
 
   /**
    * \brief Check for leading or lagging motion of any joint at a waypoint.
@@ -75,8 +71,8 @@ private:
    * \return              true if leading or lagging motion is detected on any joint
    */
   static bool detectLeadingOrLaggingMotion(const size_t num_dof,
-                                           const ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input,
-                                           const ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output);
+                                           const ruckig::InputParameter<ruckig::DynamicDOFs>& ruckig_input,
+                                           const ruckig::OutputParameter<ruckig::DynamicDOFs>& ruckig_output);
 
   /**
    * \brief Initialize Ruckig position/vel/accel. This initializes ruckig_input and ruckig_output to the same values
@@ -86,8 +82,8 @@ private:
    * \param num_dof         Number  of actuated joints
    * \param joint_idx       MoveIt list of joint group indices
    */
-  static void initializeRuckigState(ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input,
-                                    ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output,
+  static void initializeRuckigState(ruckig::InputParameter<ruckig::DynamicDOFs>& ruckig_input,
+                                    ruckig::OutputParameter<ruckig::DynamicDOFs>& ruckig_output,
                                     const moveit::core::RobotState& first_waypoint, size_t num_dof,
                                     const std::vector<int>& joint_idx);
 };

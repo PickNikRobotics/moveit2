@@ -82,10 +82,10 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
 
   // Instantiate the smoother
   double timestep = trajectory.getWayPointDurationFromStart(num_waypoints - 1) / (trajectory.getWayPointCount() - 1);
-  std::unique_ptr<ruckig::Ruckig<RUCKIG_DYNAMIC_DOF>> ruckig_ptr;
-  ruckig_ptr = std::make_unique<ruckig::Ruckig<RUCKIG_DYNAMIC_DOF>>(num_dof, timestep);
-  ruckig::InputParameter<RUCKIG_DYNAMIC_DOF> ruckig_input{ num_dof };
-  ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF> ruckig_output{ num_dof };
+  std::unique_ptr<ruckig::Ruckig<ruckig::DynamicDOFs>> ruckig_ptr;
+  ruckig_ptr = std::make_unique<ruckig::Ruckig<ruckig::DynamicDOFs>>(num_dof, timestep);
+  ruckig::InputParameter<ruckig::DynamicDOFs> ruckig_input{ num_dof };
+  ruckig::OutputParameter<ruckig::DynamicDOFs> ruckig_output{ num_dof };
 
   // Initialize the smoother
   const std::vector<int>& move_group_idx = group->getVariableIndexList();
@@ -167,7 +167,8 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
             {
               double prev_velocity = prev_state->getVariableVelocity(move_group_idx.at(joint));
               double curr_velocity = target_state->getVariableVelocity(move_group_idx.at(joint));
-              target_state->setVariableAcceleration(move_group_idx.at(joint), (curr_velocity - prev_velocity) / timestep);
+              target_state->setVariableAcceleration(move_group_idx.at(joint),
+                                                    (curr_velocity - prev_velocity) / timestep);
             }
             // At the first waypoint
             else
@@ -177,7 +178,7 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
           }
           target_state->update();
         }
-        ruckig_ptr = std::make_unique<ruckig::Ruckig<RUCKIG_DYNAMIC_DOF>>(num_dof, timestep);
+        ruckig_ptr = std::make_unique<ruckig::Ruckig<ruckig::DynamicDOFs>>(num_dof, timestep);
         waypoint_idx = 0;
         initializeRuckigState(ruckig_input, ruckig_output, *trajectory.getFirstWayPointPtr(), num_dof, move_group_idx);
         break;
@@ -196,8 +197,8 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
   return true;
 }
 
-void RuckigSmoothing::initializeRuckigState(ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input,
-                                            ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output,
+void RuckigSmoothing::initializeRuckigState(ruckig::InputParameter<ruckig::DynamicDOFs>& ruckig_input,
+                                            ruckig::OutputParameter<ruckig::DynamicDOFs>& ruckig_output,
                                             const moveit::core::RobotState& first_waypoint, size_t num_dof,
                                             const std::vector<int>& idx)
 {
@@ -221,8 +222,8 @@ void RuckigSmoothing::initializeRuckigState(ruckig::InputParameter<RUCKIG_DYNAMI
 }
 
 bool RuckigSmoothing::detectLeadingOrLaggingMotion(const size_t num_dof,
-                                                   const ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input,
-                                                   const ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output)
+                                                   const ruckig::InputParameter<ruckig::DynamicDOFs>& ruckig_input,
+                                                   const ruckig::OutputParameter<ruckig::DynamicDOFs>& ruckig_output)
 {
   for (size_t joint = 0; joint < num_dof; ++joint)
   {
@@ -238,10 +239,10 @@ bool RuckigSmoothing::detectLeadingOrLaggingMotion(const size_t num_dof,
   return false;
 }
 
-void RuckigSmoothing::getNextRuckigInput(const ruckig::OutputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_output,
+void RuckigSmoothing::getNextRuckigInput(const ruckig::OutputParameter<ruckig::DynamicDOFs>& ruckig_output,
                                          const moveit::core::RobotStatePtr& next_waypoint, size_t num_dof,
                                          const std::vector<int>& idx,
-                                         ruckig::InputParameter<RUCKIG_DYNAMIC_DOF>& ruckig_input)
+                                         ruckig::InputParameter<ruckig::DynamicDOFs>& ruckig_input)
 {
   // TODO(andyz): https://github.com/ros-planning/moveit2/issues/766
   // ruckig_output.pass_to_input(ruckig_input);
