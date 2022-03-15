@@ -121,8 +121,8 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
   }
 
   ruckig::Result ruckig_result;
-  bool smoothing_complete = false;
   double duration_extension_factor = 1;
+  bool smoothing_complete = false;
   while ((duration_extension_factor < MAX_DURATION_EXTENSION_FACTOR) && !smoothing_complete)
   {
     for (size_t waypoint_idx = 0; waypoint_idx < num_waypoints - 1; ++waypoint_idx)
@@ -134,17 +134,14 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
       // Run Ruckig
       ruckig_result = ruckig_ptr->update(ruckig_input, ruckig_output);
 
-      smoothing_complete = (ruckig_result == ruckig::Result::Finished);
-      if (smoothing_complete)
+      if ((waypoint_idx = num_waypoints - 2) && ruckig_result == ruckig::Result::Finished)
       {
+        smoothing_complete = true;
         break;
       }
 
-      // If the requested velocity is too great, a joint can actually "move backward" to give itself more time to
-      // accelerate to the target velocity (or way-overshoot to do the same).
-      // Iterate and decrease velocities until that behavior is gone.
-      bool lead_or_lag_detected = detectLeadingOrLaggingMotion(num_dof, ruckig_input, ruckig_output);
-      if (lead_or_lag_detected)
+      // Extend the trajectory duration if Ruckig could not reach the waypoint successfully
+      if (ruckig_result != ruckig::Result::Finished)
       {
         duration_extension_factor *= DURATION_EXTENSION_FRACTION;
         // Reset the trajectory
@@ -163,18 +160,10 @@ bool RuckigSmoothing::applySmoothing(robot_trajectory::RobotTrajectory& trajecto
             target_state->setVariableVelocity(move_group_idx.at(joint),
                                               (1 / duration_extension_factor) *
                                                   target_state->getVariableVelocity(move_group_idx.at(joint)));
-            if (time_stretch_idx > 0)
-            {
-              double prev_velocity = prev_state->getVariableVelocity(move_group_idx.at(joint));
-              double curr_velocity = target_state->getVariableVelocity(move_group_idx.at(joint));
-              target_state->setVariableAcceleration(move_group_idx.at(joint),
-                                                    (curr_velocity - prev_velocity) / timestep);
-            }
-            // At the first waypoint
-            else
-            {
-              target_state->setVariableAcceleration(move_group_idx.at(joint), 0);
-            }
+
+            double prev_velocity = prev_state->getVariableVelocity(move_group_idx.at(joint));
+            double curr_velocity = target_state->getVariableVelocity(move_group_idx.at(joint));
+            target_state->setVariableAcceleration(move_group_idx.at(joint), (curr_velocity - prev_velocity) / timestep);
           }
           target_state->update();
         }
