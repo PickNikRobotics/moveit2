@@ -329,7 +329,9 @@ void ServoNode::servoLoop()
     // Skip processing if servoing is disabled.
     if (servo_paused_)
     {
+      current_state = servo_->getCurrentRobotState(true /* block for current robot state */);
       servo_->resetSmoothing(current_state);
+      last_commanded_state_ = current_state;
       servo_frequency.sleep();
       continue;
     }
